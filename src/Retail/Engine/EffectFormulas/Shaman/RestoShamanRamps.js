@@ -3,6 +3,7 @@ import { applyDiminishingReturns } from "General/Engine/ItemUtilities";
 import { SHAMANSPELLDB } from "./RestoShamanSpellDB";
 import { reportError } from "General/SystemTools/ErrorLogging/ErrorReporting";
 import { checkBuffActive, removeBuffStack, getCurrentStats, getHaste, getSpellRaw, getStatMult } from "../Generic/RampBase";
+import { ABILITIES_FEEDING_INTO_CBT, DPS_AURA, HEALING_AURA } from "./constants";
 
 // Any settings included in this object are immutable during any given runtime. Think of them as hard-locked settings.
 const Settings = {
@@ -10,15 +11,33 @@ const Settings = {
 
 const SHAMANCONSTANTS = {
   masteryMod: 3,
-  masteryEfficiency: 0.65,
-  baseMastery: 0.24,
+  masteryEfficiency: 0.25,
   baseMana: 10000,
 
+  // TODO move to spell definitions?
   CBT: { transferRate: 0.2, expectedOverhealing: 0.25 },
-
-  auraHealingBuff: 0.96,
-  auraDamageBuff: 1.15,
+  AG: { transferRate: 0.75, expectedOverhealing: 0.2 },
+  ASC: { transferRate: 1, expectedOverhealing: 0.6 },
 }
+
+function formatMilliseconds(milliseconds) {
+  const totalSeconds = milliseconds / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  let result = '';
+  if (minutes < 10) {
+    result += '0';
+  }
+  result += minutes;
+  result += ':';
+  if (seconds < 10) {
+    result += '0';
+  }
+  return result += seconds.toFixed(3);
+}
+
+const LOGGING = true;
 
 /**
  * This function handles all of our effects that might change our spell database before the ramps begin.
@@ -53,36 +72,74 @@ const applyLoadoutEffects = (shamanSpells, settings, talents, state) => {
   return shamanSpells;
 }
 
+/** A healing spells healing multiplier. It's base healing is directly multiplied by whatever the function returns.
+ */
+const getHealingMult = (state, spellName, spell) => {
+  let mult = HEALING_AURA;
+
+  let unleashMult = 1;
+  if (["Chain Heal", "Riptide", "Riptide (hot)", "Healing Wave", "Healing Surge"].includes(spellName) && unleashLifeCheck(state, spellName, spell)) {
+    unleashMult = SHAMANSPELLDB["Unleash Life"][1].effects[spellName];
+  }
+
+  LOGGING && (unleashMult !== 1) && console.log("getHealingMult Unleash Active");
+
+  return mult * unleashMult;
+}
 
 /** A spells damage multiplier. It's base damage is directly multiplied by anything the function returns.
  */
 const getDamMult = (state, buffs, t, spellName, talents) => {
-  let mult = SHAMANCONSTANTS.auraDamageBuff;
+  let mult = DPS_AURA;
 
   return mult;
 }
 
-/** A healing spells healing multiplier. It's base healing is directly multiplied by whatever the function returns.
- */
-const getHealingMult = (buffs, t, spellName, talents) => {
-  let mult = SHAMANCONSTANTS.auraHealingBuff;
+const getTargetMult = (state, spellName, spell) => {
+  let targets = spell.targets || 1;
 
-  return mult;
+  if (["Healing Rain", "Downpour"].includes(spellName) && unleashLifeCheck(state, spellName, spell)) {
+    targets += SHAMANSPELLDB["Unleash Life"][1].effects[spellName];
+  }
+
+  return (('tags' in spell && spell.tags.includes('sqrt')) ? getSqrt(targets) : targets);
+}
+
+// TODO WELLSPRING
+export const unleashLifeCheck = (state, spellName, spell) => {
+  if (SHAMANSPELLDB["Unleash Life"][1].effects[spellName] === undefined)
+    return false;
+
+  if (spell.unleashed !== undefined)
+    return spell.unleashed;
+
+  const unleashActive = checkBuffActive(state.activeBuffs, "Unleash Life");
+  const recentUnleash = (state.time - state.unleashTimestamp) < 0.05;
+  if (unleashActive || recentUnleash) {
+    state.activeBuffs = state.activeBuffs.filter((buff) => buff.name !== "Unleash Life");
+    state.unleashTimestamp = state.time;
+  }
+  return unleashActive || recentUnleash;
 }
 
 const getSqrt = (targets) => {
   return Math.sqrt(targets);
 }
 
-const getHotName = (spellName) => spellName; // + " (hot)" throws issues when doing things by name comparison
+// separate this into sub functions to debloat
 export const runHeal = (state, spell, spellName, compile = true) => {
 
   // Pre-heal processing
-  const currentStats = state.currentStats;
   const cloudburstActive = checkBuffActive(state.activeBuffs, "Cloudburst Totem");
   let cloudburstHealing = 0;
-  const healingMult = getHealingMult(state.activeBuffs, state.t, spellName, state.talents);
-  const targetMult = (('tags' in spell && spell.tags.includes('sqrt')) ? getSqrt(spell.targets) : spell.targets) || 1;
+  const ancestralGuidanceActive = checkBuffActive(state.activeBuffs, "Ancestral Guidance");
+  let ancestralGuidanceHealing = 0;
+  const ascendanceActive = checkBuffActive(state.activeBuffs, "Ascendance");
+  let ascendanceHealing = 0;
+
+  const currentStats = state.currentStats;
+  const healingMult = getHealingMult(state, spellName, spell);
+  const targetMult = getTargetMult(state, spellName, spell);
   const healingVal = getSpellRaw(spell, currentStats, SHAMANCONSTANTS) * (1 - spell.expectedOverheal) * healingMult * targetMult;
 
   if (cloudburstActive) cloudburstHealing = (healingVal / (1 - spell.expectedOverheal)) * SHAMANCONSTANTS.CBT.transferRate * (1 - SHAMANCONSTANTS.CBT.expectedOverhealing);
@@ -90,6 +147,14 @@ export const runHeal = (state, spell, spellName, compile = true) => {
   if (compile) state.healingDone[spellName] = (state.healingDone[spellName] || 0) + healingVal;
   if (compile) state.healingDone['Cloudburst Totem'] = (state.healingDone['Cloudburst Totem'] || 0) + cloudburstHealing;
   //console.log("Mu: " + healingMult + ". " + getSpellRaw(spell, currentStats, SHAMANCONSTANTS) + ". " + targetMult);
+  LOGGING && console.log(
+    formatMilliseconds(state.time * 1000) + "\n" +
+    "Heal: " + spellName + "\n" +
+    "Mu: " + healingMult.toFixed(3) + "\n" +
+    "SpellRaw " + getSpellRaw(spell, currentStats, SHAMANCONSTANTS).toFixed(2) + "\n" +
+    "Targets: " + targetMult + "\n" +
+    "Heal: " + healingVal.toFixed(2)
+  );
 
   return healingVal;
 }
@@ -110,7 +175,7 @@ const canCastSpell = (state, spellDB, spellName) => {
 
   const spell = spellDB[spellName][0];
   let miscReq = true;
-  const cooldownReq = (state.t > spell.activeCooldown) || !spell.cooldown;
+  const cooldownReq = (state.time > spell.activeCooldown) || !spell.cooldown;
 
   //console.log("Checking if can cast: " + spellName + ": " + cooldownReq)
   return cooldownReq && miscReq;
@@ -121,6 +186,20 @@ const getSpellHPM = (state, spellDB, spellName) => {
   const spellHealing = runHeal(state, spell, spellName, false)
 
   return spellHealing / spell.cost || 0;
+}
+
+const buffApplication = (state, buff) => {
+  let modifiedBuff = buff;
+
+  modifiedBuff.sourceSpell.unleashed = unleashLifeCheck(state, modifiedBuff.sourceSpell.name, modifiedBuff.sourceSpell);
+
+  LOGGING && console.log(
+    formatMilliseconds(state.time * 1000) + "\n" +
+    "Buff Applied: " + modifiedBuff.sourceSpell.name + "\n" +
+    "Unleashed: " + (modifiedBuff.sourceSpell.unleashed)
+  );
+
+  return modifiedBuff;
 }
 
 export const genSpell = (state, spells) => {
@@ -146,10 +225,21 @@ const apl = ["Riptide", "Rest"]
  * @returns The expected healing of the full ramp.
  */
 export const runCastSequence = (sequence, stats, settings = {}, talents = {}) => {
-  //console.log("Running cast sequence");
-  let state = { t: 0.01, activeBuffs: [], healingDone: {}, damageDone: {}, manaSpent: 0, settings: settings, talents: talents, reporting: true, };
+  LOGGING && console.log("Running cast sequence");
+  const state =
+  {
+    time: 0.01,
+    activeBuffs: [],
+    healingDone: {},
+    damageDone: {},
+    manaSpent: 0,
+    settings: settings,
+    talents: talents,
+    reporting: true,
+    unleashTimestamp: -1,
+  };
 
-  const sequenceLength = 20; // The length of any given sequence. Note that each ramp is calculated separately and then summed so this only has to cover a single ramp.
+  const sequenceLength = 500; // The length of any given sequence. Note that each ramp is calculated separately and then summed so this only has to cover a single ramp.
   const seqType = "Manual" // Auto / Manual.
   let nextSpell = 0;
 
@@ -168,26 +258,25 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
 
   const seq = [...sequence];
 
-  for (var t = 0; state.t < sequenceLength; state.t += 0.01) {
-
+  for (; state.time < sequenceLength; state.time += 0.01) {
     // ---- Heal over time and Damage over time effects ----
     // When we add buffs, we'll also attach a spell to them. The spell should have coefficient information, secondary scaling and so on. 
     // When it's time for a HoT or DoT to tick (state.t > buff.nextTick) we'll run the attached spell.
     // Note that while we refer to DoTs and HoTs, this can be used to map any spell that's effect happens over a period of time. 
     // This includes stuff like Shadow Fiend which effectively *acts* like a DoT even though it is technically not one.
     // You can also call a function from the buff if you'd like to do something particularly special. You can define the function in the specs SpellDB.
-    const healBuffs = state.activeBuffs.filter(function (buff) { return (buff.buffType === "heal" || buff.buffType === "damage" || buff.buffType === "function") && state.t >= buff.next })
+    const healBuffs = state.activeBuffs.filter((buff) => { return (buff.buffType === "heal" || buff.buffType === "damage" || buff.buffType === "function") && state.time >= buff.next })
     if (healBuffs.length > 0) {
       healBuffs.forEach((buff) => {
         let currentStats = { ...stats };
         state.currentStats = getCurrentStats(currentStats, state.activeBuffs)
 
         if (buff.buffType === "heal") {
-          const spell = buff.attSpell;
-          runHeal(state, spell, buff.name + "(hot)")
+          const spell = buff.sourceSpell;
+          runHeal(state, spell, buff.name)
         }
         else if (buff.buffType === "damage") {
-          const spell = buff.attSpell;
+          const spell = buff.sourceSpell;
           runDamage(state, spell, buff.name)
         }
         else if (buff.buffType === "function") {
