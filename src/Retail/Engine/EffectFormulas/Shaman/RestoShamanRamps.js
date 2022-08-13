@@ -394,16 +394,21 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
 
             state.activeBuffs.push(newBuff);
 
+            if (spell.initialTick) {
+              runHeal(state, newBuff.sourceSpell, spellName);
+            }
           }
           else if (spell.buffType === "special") {
-
             // Check if buff already exists, if it does add a stack.
-            const buffStacks = state.activeBuffs.filter(function (buff) { return buff.name === spell.name }).length;
-            if (buffStacks === 0) state.activeBuffs.push({ name: spell.name, expiration: (state.t + spell.castTime + spell.buffDuration) || 999, buffType: "special", value: spell.value, stacks: spell.stacks || 1, canStack: spell.canStack });
-            else {
+            const buffStacks = state.activeBuffs.filter((buff) => buff.name === spell.name).length;
+            if (buffStacks === 0) {
+              state.activeBuffs.push({ name: spell.name, expiration: (state.time + spell.castTime + spell.buffDuration) || 999, buffType: "special", value: spell.value, stacks: spell.stacks || 1, canStack: spell.canStack });
+            } else {
               const buff = state.activeBuffs.filter(buff => buff.name === spell.name)[0]
 
-              if (buff.canStack) buff.stacks += 1;
+              if (buff.canStack) { 
+                buff.stacks = min(buff.maxStacks || Infinity, buff.stacks + spell.stacks)
+              }
             }
           }
           else {

@@ -87,6 +87,7 @@ export const SHAMANSPELLDB = {
     cost: 0,
     coeff: 0.22, // 
     tickRate: 3,
+    initialTick: false,
     buffDuration: 18,
     expectedOverheal: 0.3,
     secondaries: ['crit', 'vers', 'mastery'], // + Haste
@@ -97,6 +98,9 @@ export const SHAMANSPELLDB = {
     type: "buff",
     buffType: "special",
     name: "Tidal Waves",
+    stacks: 2,
+    canStack: true,
+    maxStacks: 2,
     effects: {
       "Chain Heal": 0.2,
       "Healing Wave": 0.2,
@@ -112,6 +116,7 @@ export const SHAMANSPELLDB = {
     castTime: 2,
     coeff: 0.265,
     tickRate: 2,
+    initialTick: true,
     cooldown: 10,
     hastedCooldown: false, // ?
     buffDuration: 10,
@@ -161,6 +166,7 @@ export const SHAMANSPELLDB = {
     buffType: "damage",
     coeff: 0.116, // 
     tickRate: 2,
+    initialTick: false,
     buffDuration: 18,
     secondaries: ['crit', 'vers'], // + Haste
     canPartialTick: true,
@@ -210,6 +216,7 @@ export const SHAMANSPELLDB = {
     castTime: 1,
     coeff: 0.47,
     tickRate: 2,
+    initialTick: true,
     cooldown: 30,
     hastedCooldown: false,
     buffDuration: 15,
@@ -232,6 +239,7 @@ export const SHAMANSPELLDB = {
     castTime: 1,
     coeff: 0.35,
     tickRate: 2,
+    initialTick: true,
     cooldown: 180,
     hastedCooldown: false,
     buffDuration: 10,
