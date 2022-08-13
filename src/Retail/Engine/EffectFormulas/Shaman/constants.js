@@ -7,3 +7,34 @@ export const RIPTIDE_HOT_SP = 1.32;
 export const RESTO_SHAMAN_DPS_AURA = 1.4;
 export const FAE_TRANSFUSION_SP = .94;
 export const UNLEASH_LIFE_MULT = 1.35;
+
+export const HEALING_AURA = 0.96
+export const DPS_AURA = 1.15;
+export const LAVA_BURST_AURA = 1.1;
+export const CHAIN_LIGHTNING_AURA = 1.4;
+
+export const ABILITIES_FEEDING_INTO_CBT = [
+  "Healing Wave",
+  "Chain Heal",
+  "Healing Surge",
+  "Riptide",
+  "Healing Rain",
+  "Wellspring",
+  "Unleash Life",
+  "Earth Shield",
+  "Downpour",
+  "Ascendance (cast)",
+  "Primordial Wave",
+  "Nature's Guardian",
+  "Ancestral Guidance", // hopefully
+];
+
+export const ABILITIES_NOT_FEEDING_INTO_ASCENDANCE = [
+  "Healing Tide Totem",
+  "Healing Stream Totem",
+  "Spirit Link",
+  "Leech",
+  "Ascendance",
+  "Ascendance (cast)",
+  "Cloudburst",
+];
