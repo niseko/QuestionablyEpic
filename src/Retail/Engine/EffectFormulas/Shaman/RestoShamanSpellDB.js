@@ -1,6 +1,7 @@
 
 import { FamilyRestroom, SpellcheckRounded } from "@mui/icons-material";
-import { runHeal, getHaste, runDamage } from "./RestoShamanRamps";
+import { LAVA_BURST_AURA, RIPTIDE_HOT_SP } from "./constants";
+import { runHeal, runDamage, unleashLifeCheck } from "./RestoShamanRamps";
 
 // This is the Rshaman spell database. 
 // It contains information on every spell used in a ramp. Each spell is an array which means you can include multiple effects to code spells like Mindblast. 
@@ -28,7 +29,7 @@ import { runHeal, getHaste, runDamage } from "./RestoShamanRamps";
 // Spell coefficients combine a spells base coefficient with any relevant auras that might impact the spell. 
 export const SHAMANSPELLDB = {
   "Healing Surge": [{
-    spellData: {id: 8004, icon: "spell_nature_healingway", cat: "heal"},
+    spellData: { id: 8004, icon: "spell_nature_healingway", cat: "heal" },
     type: "heal",
     castTime: 1.5,
     cost: 0.24,
@@ -37,7 +38,7 @@ export const SHAMANSPELLDB = {
     secondaries: ['crit', 'vers', 'mastery']
   }],
   "Wellspring": [{
-    spellData: {id: 197997, icon: "ability_shawaterelemental_split", cat: "heal"},
+    spellData: { id: 197997, icon: "ability_shawaterelemental_split", cat: "heal" },
     type: "heal",
     castTime: 1.5,
     cooldown: 20,
@@ -48,8 +49,9 @@ export const SHAMANSPELLDB = {
     secondaries: ['crit', 'vers', 'mastery']
   }],
   "Chain Heal": [{
-    spellData: {id: 1064, icon: "spell_nature_healingwavegreater", cat: "heal"},
+    spellData: { id: 1064, icon: "spell_nature_healingwavegreater", cat: "heal" },
     type: "function",
+    name: "Chain Heal",
     castTime: 1.5,
     cost: 0.3,
     coeff: 2.1,
@@ -57,19 +59,18 @@ export const SHAMANSPELLDB = {
     bounceReduc: 0.7,
     expectedOverheal: 0.22,
     secondaries: ['crit', 'vers', 'mastery'],
-    runFunc: function (state, spell) {
+    runFunc: (state, spell) => {
       let mult = 1;
-
+      const unleashed = unleashLifeCheck(state, spell.name, spell);
       for (let i = 0; i < spell.targets; i++) {
-        const newSpell = { type: "heal", coeff: spell.coeff * mult, expectedOverheal: spell.expectedOverheal, secondaries: ['crit', 'vers', 'mastery'], targets: 1 }
+        const newSpell = { type: "heal", coeff: spell.coeff * mult, expectedOverheal: spell.expectedOverheal, secondaries: ['crit', 'vers', 'mastery'], targets: 1, unleashed: unleashed }
         runHeal(state, newSpell, "Chain Heal")
         mult *= spell.bounceReduc;
       }
-
     }
   }],
   "Riptide": [{ // charges?
-    spellData: {id: 61295, icon: "spell_nature_riptide", cat: "heal"},
+    spellData: { id: 61295, icon: "spell_nature_riptide", cat: "heal" },
     type: "heal",
     castTime: 1.5,
     cost: 0.08,
@@ -82,6 +83,7 @@ export const SHAMANSPELLDB = {
   {
     type: "buff",
     buffType: "heal",
+    name: "Riptide (hot)",
     cost: 0,
     coeff: 0.22, // 
     tickRate: 3,
@@ -89,10 +91,22 @@ export const SHAMANSPELLDB = {
     expectedOverheal: 0.3,
     secondaries: ['crit', 'vers', 'mastery'], // + Haste
     canPartialTick: true,
+  },
+  {
+    spellData: { id: 51564, icon: "spell_shaman_tidalwaves" },
+    type: "buff",
+    buffType: "special",
+    name: "Tidal Waves",
+    effects: {
+      "Chain Heal": 0.2,
+      "Healing Wave": 0.2,
+      "Healing Surge": 0.3,
+    },
   }],
   "Healing Rain": [{
-    spellData: {id: 73920, icon: "spell_nature_giftofthewaterspirit", cat: "heal"}, // cast id
+    spellData: { id: 73920, icon: "spell_nature_giftofthewaterspirit", cat: "heal" }, // cast id
     type: "buff",
+    name: "Healing Rain",
     buffType: "heal",
     cost: 0.216,
     castTime: 2,
@@ -116,7 +130,7 @@ export const SHAMANSPELLDB = {
     secondaries: ['crit', 'vers', 'mastery'], // + Haste
   }],*/
   "Cloudburst Totem": [{
-    spellData: {id: 157153, icon: "ability_shaman_condensationtotem", cat: "cooldown"},
+    spellData: { id: 157153, icon: "ability_shaman_condensationtotem", cat: "cooldown" },
     type: "buff",
     name: "Cloudburst Totem",
     cost: 0.086,
@@ -131,7 +145,8 @@ export const SHAMANSPELLDB = {
   "Earthbind Totem": [{}],
   "Far Sight": [{}],
   "Flame Shock": [{
-    spellData: {id: 188389, icon: "spell_fire_flameshock", cat: "damage"},
+    spellData: { id: 188389, icon: "spell_fire_flameshock", cat: "damage" },
+    name: "Flame Shock",
     type: "damage",
     castTime: 1.5,
     cost: 0.015,
@@ -141,11 +156,12 @@ export const SHAMANSPELLDB = {
   {
     cost: 0,
     castTime: 0,
+    name: "Flame Shock (dot)",
     type: "buff",
     buffType: "damage",
     coeff: 0.116, // 
     tickRate: 2,
-    buffDuration: 12,
+    buffDuration: 18,
     secondaries: ['crit', 'vers'], // + Haste
     canPartialTick: true,
   }],
@@ -153,7 +169,7 @@ export const SHAMANSPELLDB = {
   "Ghost Wolf": [{}],
   "Bloodlust": [{}],
   "Lightning Bolt": [{
-    spellData: {id: 188196, icon: "spell_nature_lightning", cat: "damage"},
+    spellData: { id: 188196, icon: "spell_nature_lightning", cat: "damage" },
     type: "damage",
     castTime: 2.5,
     cost: 0.01,
@@ -161,24 +177,35 @@ export const SHAMANSPELLDB = {
     cooldown: 0,
     secondaries: ['crit', 'vers'],
   }],
+  "Chain Lightning": [{
+    spellData: { id: 188443, icon: "spell_nature_chainlightning", cat: "damage" },
+    type: "damage",
+    castTime: 2,
+    cost: 0.01,
+    coeff: 0.635,
+    cooldown: 0,
+    targets: 3,
+    secondaries: ['crit', 'vers'],
+  }],
   "Lightning Shield": [{}],
   "Primal Strike": [{}],
   "Water Walking": [{}],
   "Reincarnation": [{}],
   "Lava Burst": [{
-    spellData: {id: 51505, icon: "spell_shaman_lavaburst", cat: "damage"},
+    spellData: { id: 51505, icon: "spell_shaman_lavaburst", cat: "damage" },
     type: "damage",
     castTime: 2,
     cost: 0.025,
-    coeff: 0.972, // flame shock aura double crit not accounted for
+    coeff: 0.972 * LAVA_BURST_AURA, // flame shock aura double crit not accounted for
     cooldown: 8,
     hastedCooldown: false,
     secondaries: ['crit', 'vers'],
   }],
   "Healing Stream Totem": [{
-    spellData: {id: 5394, icon: "inv_spear_04", cat: "heal"},
+    spellData: { id: 5394, icon: "inv_spear_04", cat: "heal" },
     type: "buff",
     buffType: "heal",
+    name: "Healing Stream Totem",
     cost: 0.09,
     castTime: 1,
     coeff: 0.47,
@@ -197,9 +224,10 @@ export const SHAMANSPELLDB = {
   "Stormkeeper": [{}],
   "Spirit Link Totem": [{}],
   "Healing Tide Totem": [{
-    spellData: {id: 108280, icon: "ability_shaman_healingtide", cat: "cooldown"},
+    spellData: { id: 108280, icon: "ability_shaman_healingtide", cat: "cooldown" },
     type: "buff",
     buffType: "heal",
+    name: "Healing Tide Totem",
     cost: 0.056,
     castTime: 1,
     coeff: 0.35,
@@ -214,24 +242,36 @@ export const SHAMANSPELLDB = {
   }],
   "Mana Tide Totem": [{}],
   "Unleash Life": [{ // todo special handling
-    spellData: {id: 73685, icon: "spell_shaman_unleashweapon_life", cat: "heal"},
+    spellData: { id: 73685, icon: "spell_shaman_unleashweapon_life", cat: "heal" },
     type: "heal",
-    cost: 0.04,
     castTime: 1.5,
+    cost: 0.04,
     coeff: 1.9,
     cooldown: 15,
+    expectedOverheal: 0.15,
     secondaries: ['crit', 'vers', 'mastery'],
     hastedCooldown: false,
   }, {
     type: "buff",
     buffType: "special",
+    name: "Unleash Life",
+    effects: {
+      "Chain Heal": 1.15,
+      "Riptide": 1.3,
+      "Riptide (hot)": 1.3,
+      "Healing Wave": 1.3,
+      "Healing Surge": 1.3,
+      "Healing Rain": 2,
+      "Downpour": 2,
+      "Wellspring": 0.25,
+    },
     buffDuration: 10,
   }],
   "Ancestral Protaction Totem": [{}],
   "Earthen Wall Totem": [{}],
   "Primordial Wave": [{}], // good luck
   "Downpour": [{
-    spellData: {id: 207778, icon: "ability_mage_waterjet", cat: "heal"},
+    spellData: { id: 207778, icon: "ability_mage_waterjet", cat: "heal" },
     type: "heal",
     castTime: 1.5,
     cooldown: 5, // increased by each target effectively healed
@@ -242,8 +282,9 @@ export const SHAMANSPELLDB = {
     secondaries: ['crit', 'vers', 'mastery']
   }],
   "Ascendance": [{
-    spellData: {id: 114052, icon: "spell_fire_elementaldevastation", cat: "cooldown"},
+    spellData: { id: 114052, icon: "spell_fire_elementaldevastation", cat: "cooldown" },
     type: "heal",
+    name: "Ascendance (cast)",
     castTime: 1.5,
     cooldown: 180,
     targets: 1, // distributed
@@ -255,6 +296,7 @@ export const SHAMANSPELLDB = {
   {
     type: "buff",
     buffType: "special",
+    name: "Ascendance",
     castTime: 0,
     targets: 1, // distributed
     cost: 0.2,
@@ -265,7 +307,7 @@ export const SHAMANSPELLDB = {
   "Earthen Elemental": [{}],
   "Astral Shift": [{}],
   "Frost Shock": [{
-    spellData: {id: 196840, icon: "spell_frost_frostshock", cat: "damage"},
+    spellData: { id: 196840, icon: "spell_frost_frostshock", cat: "damage" },
     type: "damage",
     castTime: 1.5,
     cost: 0.01,
@@ -280,18 +322,28 @@ export const SHAMANSPELLDB = {
   "Poison Cleansing Totem": [{}],
   "Stoneskin Totem": [{}],
   "Ancestral Guidance": [{
-    spellData: {id: 108281, icon: "ability_shaman_ancestralguidance", cat: "cooldown"},
+    spellData: { id: 108281, icon: "ability_shaman_ancestralguidance", cat: "cooldown" },
     type: "buff",
     buffType: "special",
+    name: "Ancestral Guidance",
     castTime: 0,
     cost: 0,
     coeff: 0.75, // distributed on 3
     expectedOverheal: 0.19,
     secondaries: ['crit', 'vers', 'mastery']
   }],
-
+  "Tidal Waves": [{ // todo: remove from riptide and implement properly through talent
+    spellData: { id: 51564, icon: "spell_shaman_tidalwaves" },
+    type: "buff",
+    buffType: "special",
+    name: "Tidal Waves",
+    effects: {
+      "Chain Heal": 0.2,
+      "Healing Wave": 0.2,
+      "Healing Surge": 0.3,
+    }
+  }],
 }
-
 
 // Adding talents with pure utility benefit is not currently necessary.
 export const shamanTalents = {
@@ -315,7 +367,5 @@ export const shamanTalents = {
   masterOfTheElements: false,
   cloudBurstTotem: false,
   livingStream: false,
-
-
 
 }
