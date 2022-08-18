@@ -13,28 +13,30 @@ export const DPS_AURA = 1.15;
 export const LAVA_BURST_AURA = 1.1;
 export const CHAIN_LIGHTNING_AURA = 1.4;
 
-export const ABILITIES_FEEDING_INTO_CBT = [
+export const ABILITIES_FEEDING_INTO_ASCENDANCE  = [
   "Healing Wave",
   "Chain Heal",
   "Healing Surge",
   "Riptide",
   "Healing Rain",
+  "Overflowing Shores",
   "Wellspring",
   "Unleash Life",
   "Earth Shield",
   "Downpour",
-  "Ascendance (cast)",
   "Primordial Wave",
   "Nature's Guardian",
-  "Ancestral Guidance", // hopefully
+  //"Ancestral Awakening", Apparently doesn't work with CBT, need to confirm exact details
+  "Earthliving Weapon", // unconfirmed
 ];
 
-export const ABILITIES_NOT_FEEDING_INTO_ASCENDANCE = [
-  "Healing Tide Totem",
-  "Healing Stream Totem",
-  "Spirit Link",
-  "Leech",
-  "Ascendance",
+export const ABILITIES_FEEDING_INTO_CBT = [
+  ...ABILITIES_FEEDING_INTO_ASCENDANCE,
   "Ascendance (cast)",
-  "Cloudburst",
+];
+
+export const ABILITIES_FEEDING_INTO_AG = [
+  ...ABILITIES_FEEDING_INTO_CBT,
+  "Cloudburst Totem",
+  "Ascendance",
 ];

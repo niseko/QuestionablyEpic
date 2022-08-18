@@ -101,6 +101,7 @@ export const SHAMANSPELLDB = {
     stacks: 2,
     canStack: true,
     maxStacks: 2,
+    buffDuration: 15,
     effects: {
       "Chain Heal": 0.2,
       "Healing Wave": 0.2,
@@ -125,7 +126,6 @@ export const SHAMANSPELLDB = {
     secondaries: ['crit', 'vers', 'mastery'], // + Haste
     canPartialTick: true,
   }],
-  /*
   "Overflowing Shores": [{
     spellData: {id: 73920, icon: "spell_nature_giftofthewaterspirit"},
     type: "heal",
@@ -133,7 +133,7 @@ export const SHAMANSPELLDB = {
     targets: 6,
     expectedOverheal: 0.15,
     secondaries: ['crit', 'vers', 'mastery'], // + Haste
-  }],*/
+  }],
   "Cloudburst Totem": [{
     spellData: { id: 157153, icon: "ability_shaman_condensationtotem", cat: "cooldown" },
     type: "buff",
@@ -364,16 +364,25 @@ export const shamanTalents = {
   // Spec Talents
   waterShield: false,
   tidalWaves: false,
-  deluge: false,
+  deluge: 0,
   acidRain: false,
   callOfThunder: false,
   overflowingShores: 0, // /2
+  ancestralReach: false,
+  flowOfTheTides: false,
+  cloudburstTotem: false,
   lavaSurge: false,
+  torrent: 0,
   flashFlood: 0, // /2
   waterTotemMastery: false,
   wavespeakersBlessing: false,
   masterOfTheElements: false,
-  cloudBurstTotem: false,
   livingStream: false,
-
+  undulation: false,
+  ancestralAwakening: 0,
+  earthenHarmony: 0,
+  undercurrent: 0,
+  improvedPrimordialWave: false,
+  naturesFocus: false,
+  earthlivingWeapon: false,
 }

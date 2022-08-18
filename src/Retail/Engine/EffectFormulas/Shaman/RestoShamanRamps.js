@@ -43,12 +43,12 @@ const LOGGING = true;
  * This function handles all of our effects that might change our spell database before the ramps begin.
  * It includes conduits, legendaries, and some trinket effects.
  * 
- * @param {*} shamanSpells Our spell database
+ * @param {*} spells Our spell database
  * @param {*} settings Settings including legendaries, trinkets, soulbinds and anything that falls out of any other category.
  * @param {*} talents The talents run in the current set.
  * @returns An updated spell database with any of the above changes made.
  */
-const applyLoadoutEffects = (shamanSpells, settings, talents, state) => {
+const applyLoadoutEffects = (spells, settings, talents, state) => {
 
   // ==== Default Loadout ====
   // While Top Gear can automatically include everything at once, individual modules like Trinket Analysis require a baseline loadout
@@ -66,10 +66,73 @@ const applyLoadoutEffects = (shamanSpells, settings, talents, state) => {
 
 
   // Spec talents.
-  // Remember, if it adds an entire ability then it shouldn't be in this section. Add it to ramp generators in RampGen.
+  //if (talents.deluge)
 
+  if (talents.overflowingShores) {
+    //spells['Healing Rain'].push(spells['Overflowing Shores']);
+    // missing an "ON CAST"?
+  }
 
-  return shamanSpells;
+  if (talents.ancestralReach) {
+    spells['Chain Heal'][0].targets += 1;
+    spells['Chain Heal'][0].coeff *= 1.08;
+  }
+
+  if (talents.flowOfTheTides) {
+    // 30% to chain heal
+    // removes a riptide
+  }
+
+  if (talents.cloudburstTotem) {
+    // activate cbt (should be generalized)
+    // remove HST
+  }
+
+  if (talents.livingStream) {
+    // increase each tick by 10%
+  }
+
+  if (talents.wavespeakersBlessing) {
+    spells['Riptide'][1].buffDuration += 3;
+  }
+
+  if (talents.torrent) {
+    spells['Riptide'][0].coeff *= (1 + (talents.torrent / 10))
+  }
+
+  if (talents.undulation) {
+    // buff every 3rd hw hs
+  }
+
+  if (talents.ancestralAwakening) {
+    // attach extra heals to rt, hs, hw
+  }
+
+  if (talents.earthenHarmony) {
+    // buff ES, ES lasts longer
+  }
+
+  if (talents.undercurrent) {
+    // global heal buff
+    // probably put the multiplier in state and calculate it in getHealingMult
+    // or model as a buff
+  }
+
+  if (talents.improvedPrimordialWave) {
+    // increase cleave %
+  }
+
+  if (talents.naturesFocus) {
+    // idk this is disgusting
+  }
+
+  if (talents.everRisingTide) {
+    // model this as an actual spell, remove from here
+  }
+
+  
+
+  return spells;
 }
 
 /** A healing spells healing multiplier. It's base healing is directly multiplied by whatever the function returns.
@@ -400,15 +463,28 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
           }
           else if (spell.buffType === "special") {
             // Check if buff already exists, if it does add a stack.
-            const buffStacks = state.activeBuffs.filter((buff) => buff.name === spell.name).length;
-            if (buffStacks === 0) {
-              state.activeBuffs.push({ name: spell.name, expiration: (state.time + spell.castTime + spell.buffDuration) || 999, buffType: "special", value: spell.value, stacks: spell.stacks || 1, canStack: spell.canStack });
-            } else {
-              const buff = state.activeBuffs.filter(buff => buff.name === spell.name)[0]
+            const buff = state.activeBuffs.find(buff => buff.name === spell.name);
 
-              if (buff.canStack) { 
-                buff.stacks = min(buff.maxStacks || Infinity, buff.stacks + spell.stacks)
+            if (buff) {
+              const oldstacks = buff.stacks;
+              if (buff.canStack) {
+                buff.stacks = Math.min(buff.maxStacks || Infinity, buff.stacks + (spell.stacks || 1));
               }
+              LOGGING && console.log(
+                formatMilliseconds(state.time * 1000) + "\n" +
+                "Buff Stack Delta: " + (buff.stacks - oldstacks)
+              );
+            } else {
+              state.activeBuffs.push({
+                ...spell,
+                expiration: (state.time + spell.castTime + spell.buffDuration) || 999,
+                stacks: spell.stacks || 1,
+              });
+              LOGGING && console.log(
+                formatMilliseconds(state.time * 1000) + "\n" +
+                "Buff Applied: " + spell.name + "\n" +
+                "Stacks: " + spell.stacks || 1
+              );
             }
           }
           else {
@@ -422,7 +498,6 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
           spell.activeCooldown = state.time + (spell.cooldown / getHaste(currentStats));
 
         // Grab the next timestamp we are able to cast our next spell. This is equal to whatever is higher of a spells cast time or the GCD.
-
       });
 
       if (fullSpell[0].castTime)
