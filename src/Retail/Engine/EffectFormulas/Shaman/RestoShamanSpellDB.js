@@ -37,6 +37,15 @@ export const SHAMANSPELLDB = {
     expectedOverheal: 0.14,
     secondaries: ['crit', 'vers', 'mastery']
   }],
+  "Healing Wave": [{
+    spellData: { id: 77472, icon: "spell_nature_healingwavelesser", cat: "heal" },
+    type: "heal",
+    castTime: 2.5,
+    cost: 0.15,
+    coeff: 3,
+    expectedOverheal: 0.2,
+    secondaries: ['crit', 'vers', 'mastery']
+  }],
   "Wellspring": [{
     spellData: { id: 197997, icon: "ability_shawaterelemental_split", cat: "heal" },
     type: "heal",
