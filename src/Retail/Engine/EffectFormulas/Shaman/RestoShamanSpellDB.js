@@ -116,6 +116,13 @@ export const SHAMANSPELLDB = {
       "Healing Wave": 0.2,
       "Healing Surge": 0.3,
     },
+  },
+  {
+    spellData: { id: 382194, icon: "spell_fire_bluehellfire" },
+    type: "buff",
+    buffType: "special",
+    name: "Undercurrent",
+    buffDuration: 18,
   }],
   "Healing Rain": [{
     spellData: { id: 73920, icon: "spell_nature_giftofthewaterspirit", cat: "heal" }, // cast id
@@ -136,7 +143,7 @@ export const SHAMANSPELLDB = {
     canPartialTick: true,
   }],
   "Overflowing Shores": [{
-    spellData: {id: 73920, icon: "spell_nature_giftofthewaterspirit"},
+    spellData: { id: 73920, icon: "spell_nature_giftofthewaterspirit" },
     type: "heal",
     coeff: 0.25,
     targets: 6,

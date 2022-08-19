@@ -2,8 +2,11 @@
 import { applyDiminishingReturns } from "General/Engine/ItemUtilities";
 import { SHAMANSPELLDB } from "./RestoShamanSpellDB";
 import { reportError } from "General/SystemTools/ErrorLogging/ErrorReporting";
-import { checkBuffActive, removeBuffStack, getCurrentStats, getHaste, getSpellRaw, getStatMult } from "../Generic/RampBase";
+import { checkBuffActive, getBuffStacks, removeBuffStack, getCurrentStats, getHaste, getSpellRaw, getStatMult } from "../Generic/RampBase";
 import { ABILITIES_FEEDING_INTO_CBT, DPS_AURA, HEALING_AURA } from "./constants";
+
+const UNDERCURRENT_HEALING_INCREASE = 0.5;
+const LIVING_STREAM_HEALING_MULTIPLIER = 1.1;
 
 // Any settings included in this object are immutable during any given runtime. Think of them as hard-locked settings.
 const Settings = {
@@ -94,6 +97,7 @@ const applyLoadoutEffects = (spells, settings, talents, state) => {
 
   if (talents.wavespeakersBlessing) {
     spells['Riptide'][1].buffDuration += 3;
+    spells['Riptide'][3].buffDuration += 3;
   }
 
   if (talents.torrent) {
@@ -112,12 +116,6 @@ const applyLoadoutEffects = (spells, settings, talents, state) => {
     // buff ES, ES lasts longer
   }
 
-  if (talents.undercurrent) {
-    // global heal buff
-    // probably put the multiplier in state and calculate it in getHealingMult
-    // or model as a buff
-  }
-
   if (talents.improvedPrimordialWave) {
     // increase cleave %
   }
@@ -130,7 +128,7 @@ const applyLoadoutEffects = (spells, settings, talents, state) => {
     // model this as an actual spell, remove from here
   }
 
-  
+
 
   return spells;
 }
@@ -138,16 +136,30 @@ const applyLoadoutEffects = (spells, settings, talents, state) => {
 /** A healing spells healing multiplier. It's base healing is directly multiplied by whatever the function returns.
  */
 const getHealingMult = (state, spellName, spell) => {
-  let mult = HEALING_AURA;
+  let multiplier = HEALING_AURA;
 
-  let unleashMult = 1;
   if (["Chain Heal", "Riptide", "Riptide (hot)", "Healing Wave", "Healing Surge"].includes(spellName) && unleashLifeCheck(state, spellName, spell)) {
-    unleashMult = SHAMANSPELLDB["Unleash Life"][1].effects[spellName];
+    multiplier *= SHAMANSPELLDB["Unleash Life"][1].effects[spellName];
+    LOGGING && console.log("getHealingMult Unleash Active");
   }
 
-  LOGGING && (unleashMult !== 1) && console.log("getHealingMult Unleash Active");
+  // ideally put stuff like this in a "modifiers" object or similar
+  // so you can track and print what is happening
+  if (state.talents.livingStream && spellName === "Healing Stream Totem") {
+    const mod = spell.livingStream || 1;
+    // the very first tick is already increased by 10% so this order is correct
+    spell.livingStream = mod * LIVING_STREAM_HEALING_MULTIPLIER;
+    multiplier *= spell.livingStream;
+    LOGGING && console.log("living stream: " + spell.livingStream.toFixed(2));
+  }
 
-  return mult * unleashMult;
+  if (state.talents.undercurrent) {
+    const undercurrentStacks = state.activeBuffs.filter(buff => buff.name === "Riptide (hot)").length;
+    multiplier *= (1 + (undercurrentStacks * UNDERCURRENT_HEALING_INCREASE * state.talents.undercurrent / 100));
+    LOGGING && console.log("undercurrent stacks: " + undercurrentStacks);
+  }
+
+  return multiplier;
 }
 
 /** A spells damage multiplier. It's base damage is directly multiplied by anything the function returns.
@@ -321,6 +333,8 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
     reporting: true,
     unleashTimestamp: -1,
   };
+  talents.livingStream = true;
+  talents.undercurrent = 2;
 
   const sequenceLength = 500; // The length of any given sequence. Note that each ramp is calculated separately and then summed so this only has to cover a single ramp.
   const seqType = "Manual" // Auto / Manual.
@@ -348,7 +362,7 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
     // Note that while we refer to DoTs and HoTs, this can be used to map any spell that's effect happens over a period of time. 
     // This includes stuff like Shadow Fiend which effectively *acts* like a DoT even though it is technically not one.
     // You can also call a function from the buff if you'd like to do something particularly special. You can define the function in the specs SpellDB.
-    const healBuffs = state.activeBuffs.filter((buff) => { return (buff.buffType === "heal" || buff.buffType === "damage" || buff.buffType === "function") && state.time >= buff.next })
+    const healBuffs = state.activeBuffs.filter((buff) => (buff.buffType === "heal" || buff.buffType === "damage" || buff.buffType === "function") && state.time >= buff.next)
     if (healBuffs.length > 0) {
       healBuffs.forEach((buff) => {
         let currentStats = { ...stats };
@@ -389,7 +403,7 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
         runHeal(state, spell, buff.name);
     })
 
-    // Remove any buffs that have expired. Note that we call this after we handle partial ticks. 
+    // Remove any buffs that have expired. Note that we call this after we handle partial ticks.
     state.activeBuffs = state.activeBuffs.filter((buff) => buff.expiration > state.time);
 
     // This is a check of the current time stamp against the tick our GCD ends and we can begin our queued spell.
@@ -467,9 +481,8 @@ export const runCastSequence = (sequence, stats, settings = {}, talents = {}) =>
 
             if (buff) {
               const oldstacks = buff.stacks;
-              if (buff.canStack) {
-                buff.stacks = Math.min(buff.maxStacks || Infinity, buff.stacks + (spell.stacks || 1));
-              }
+              buff.stacks = Math.min(buff.maxStacks || Infinity, buff.stacks + (spell.stacks || 1));
+
               LOGGING && console.log(
                 formatMilliseconds(state.time * 1000) + "\n" +
                 "Buff Stack Delta: " + (buff.stacks - oldstacks)
